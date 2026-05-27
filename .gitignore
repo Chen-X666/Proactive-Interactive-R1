@@ -23,8 +23,6 @@ ms-swift/
 ab_uncertainty/
 datasets/
 results/
-generalization_eval/coqa
-uncertainty-awara_data_construction/
 verl-tool/examples/data_preprocess/test
 
 # SFT
