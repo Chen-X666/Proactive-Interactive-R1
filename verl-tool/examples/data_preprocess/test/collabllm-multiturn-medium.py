@@ -26,7 +26,7 @@ os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--local_dir', default='/home/chenxin/verl-interactive/verl-tool_old/data/collabllm/collabllm-multiturn-medium-large')
+    parser.add_argument('--local_dir', default='/home/chenxin/verl-interactive/verl-tool/dataq/collabllm/collabllm-multiturn-medium-large')
     parser.add_argument('--hdfs_dir', default=None)
 
     args = parser.parse_args()

@@ -82,7 +82,7 @@ class UserSimulatorClient:
             max_tokens=self.max_model_len,
             timeout=self.timeout,
         )
-        
+        # print(resp)
         if isinstance(resp, str):
             raise ValueError(f"Model returned error: {resp}")
         
@@ -154,16 +154,16 @@ if __name__ == "__main__":
 
     client = OpenAI(
         api_key="sk-xxx",
-        base_url="http://10.10.128.132:8725/v1/",
+        base_url="http://10.10.128.132:8725/v1",
     )
 
     simulator = UserSimulatorClient(
         client=client,
-        model_name="Llama-3.1-8B-Instruct",
+        model_name="DeepSeek-R1-Distill-Qwen-7B",
     )
 
     response = simulator.chat(
-        user_message="Hi! I've drafted an exciting update...",
+        user_message="Hi! I've drafted an exciting update...please reasoning step by step",
         task_desc="document writing",
         single_turn_prompt="Please write an article...",
     )

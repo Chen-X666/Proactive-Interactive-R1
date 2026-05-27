@@ -26,3 +26,5 @@ LLM_JUDGEMENT_API_BASE=https://api.ai-gaochao.cn/v1/ LLM_JUDGEMENT_API_KEY="sk-x
     --input_file /home/chenxin/verl-interactive/results/squad/Proactive-Interactive-R1-Math-7B_Llama-3.1-8B-Instruct_interactive_generation/squad_results_Proactive-Interactive-R1-Math-7B.jsonl \
     --tokenizer_path Proactive-Interactive-R1/Proactive-Interactive-R1-Math-7B \
     --use_llm_judge
+
+python -m generalization_eval.retrieval_question_answering.run_coqa_direct_generation \

@@ -24,6 +24,7 @@ from .metrics.helpfulness import HelpfullnessMetric
 # Global locks to ensure thread safety for file I/O and printing
 FILE_LOCK = threading.Lock()
 f = threading.Lock()
+PRINT_LOCK = threading.Lock()
 
 def _count_asking_tags(text):
     opening_tags = text.count("<asking>")
@@ -106,8 +107,17 @@ def compute_score(solution_str, ground_truth, base_score = 0.5):
 
         if target_answer_is_correct:
             if open_count > 0 or close_count > 0:
+                eff_reward = (5 - open_count) / (5 - 1)
                 if judge and open_count == close_count:
                     eff_reward = (5 - open_count) / (5 - 1)
+                    # eff_reward = (5 - open_count) / 5
+                    # 1 -> 4/4 
+                    # 0 -> 0 -> 1
+                    # eff = (5 - open_count) / 5
+                    # 0 -> 5 - 0 / 5 -> 0
+                    # 1 -> 5 - 1 / 5 -> 4/5
+                    # 2 -> 5 - 2 / 5 -> 3/5
+                    # 5 -> 5- 5 /5 -> 0
                     
                     helpful_reward = []
 
@@ -135,7 +145,7 @@ def compute_score(solution_str, ground_truth, base_score = 0.5):
                     # return base_score + (base_score * np.mean(helpful_reward) * eff_reward)
                     return base_score, helpful_reward, eff_reward
                 else:
-                    return base_score, 0.0, 0.0
+                    return base_score, 1.0, eff_reward
             else:
                 return base_score, 0.0, 0.0
         else:
@@ -232,12 +242,14 @@ class InteractiveR1MathRewardManager:
                 #     solution_str=sequences_str, 
                 #     ground_truth=ground_truth, 
                 # )
-                
                 base_score, helpfulness_score, efficiency_score = compute_score(
-                    solution_str=sequences_str, 
+                    solution_str=sequences_str,
                     ground_truth=ground_truth, 
                 )
+                # if helpfulness_score != 0.0 and not isinstance(helpfulness_score, list):
+                #     helpfulness_score = np.array(helpfulness_score)
                 calculated_score = base_score + (base_score * np.mean(helpfulness_score) * efficiency_score)
+                # calculated_score = base_score + (base_score * (np.mean(helpfulness_score) + efficiency_score))
 
                 record = {
                     'id': data_item.non_tensor_batch['extra_info']['id'] if 'id' in data_item.non_tensor_batch['extra_info'] else None,

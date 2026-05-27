@@ -1,5 +1,7 @@
 # Reasoning While Asking: Transforming Reasoning LLMs into Proactive Inquirers (PIR)
 
+
+
 [![arXiv](https://img.shields.io/badge/arXiv-2601.22139-b31b1b.svg)](https://arxiv.org/abs/2601.22139)
 [![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-Models-ffd21e.svg)](https://huggingface.co/Proactive-Interactive-R1)
 
@@ -48,6 +50,10 @@ Unlike standard reasoning LLMs that hallucinate when premises are missing, **PIR
 ## 🔬 Method
 
 PIR consists of two phases:
+
+<p align="center">
+<img src="image/methodology.png" width="800" alt="PIR Framework Overview">
+</p>
 
 ### Phase I: Interactive Capability Activation
 - Detects uncertainty via **Predictive Entropy** at each reasoning step

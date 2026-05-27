@@ -24,7 +24,7 @@ def save_partial_output(dataset, output_file_path, processed_count):
         json.dump(dataset, f, indent=4, ensure_ascii=False)
     print(f"Processed and saved {processed_count} items to {output_file_path}")
 
-def eval_output(model_completion, solution):
+def eval_output(model_completion, item):
     
     def verify_answer(output_content, item):
         """Verify answer"""
@@ -32,7 +32,7 @@ def eval_output(model_completion, solution):
             if item.get("answer"):
                 gold_parsed = item['answer']
             else:
-                gold_parsed = extract_answer(solution)
+                gold_parsed = extract_answer(item['solution'])
 
             answer_parsed = extract_answer(output_content)
             print(f"Extracted Answer: {answer_parsed}, Gold: {gold_parsed}")
@@ -52,7 +52,7 @@ def eval_output(model_completion, solution):
     else:
         output_content = model_completion.strip()
 
-    reward, answer_parsed, gold_parsed = verify_answer(model_completion, solution) if model_completion else (None, None, None)
+    reward, answer_parsed, gold_parsed = verify_answer(model_completion, item) if model_completion else (None, None, None)
 
     result = {
         "reward": reward,
@@ -172,8 +172,8 @@ def batch_run(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Interactive Generation with Human Input")
-    parser.add_argument("--input_file", type=str, required=False, help="训练数据集路径", default="/home/chenxin/verl-interactive/datasets/mip/gsm8k.json")
-    parser.add_argument("--model_url", type=str, required=False, help="模型URL", default="http://localhost:1136")
+    parser.add_argument("--input_file", type=str, required=False, help="训练数据集路径", default="/home/chenxin/verl-interactive/datasets/test.json")
+    parser.add_argument("--model_url", type=str, required=False, help="模型URL", default="http://localhost:1137")
     parser.add_argument("--model_name", type=str, required=False, help="模型名称", default="Proactive-Interactive-R1-Math-7B")
     parser.add_argument("--question_key", type=str, required=False, help="问题字段名称", default="question")
     parser.add_argument("--output_dir", type=str, required=False, help="输出目录", default="results/")

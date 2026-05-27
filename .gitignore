@@ -1,9 +1,11 @@
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.pyc
 *.ipynb
 .ipynb_checkpoints/
 logs/
 
+# RL
 verl-tool/data/
 verl-tool/outputs/
 verl-tool/verl_step_records/
@@ -14,13 +16,22 @@ verl-tool/examples/train/search_r1_test
 verl-tool/verl_tool/workers/reward_manager/test/
 verl-tool/verl_tool/servers/tools/test/
 
+# Other
 search_r1_test/
 draw_figure/
 ms-swift/
 ab_uncertainty/
 datasets/
 results/
+generalization_eval/coqa
+uncertainty-awara_data_construction/
+verl-tool/examples/data_preprocess/test
 
+# SFT
 LLaMA-Factory/auto_run.py
 LLaMA-Factory/test_run/
 LLaMA-Factory/data/sft_conversation_results/
+
+# User Study
+user_study/results
+
