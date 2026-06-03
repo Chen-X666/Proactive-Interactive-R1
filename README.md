@@ -1,4 +1,4 @@
-# Reasoning While Asking: Transforming Reasoning LLMs into Proactive Inquirers (PIR)
+# [ACL 2026] Reasoning While Asking: Transforming Reasoning LLMs into Proactive Inquirers (PIR)
 
 
 

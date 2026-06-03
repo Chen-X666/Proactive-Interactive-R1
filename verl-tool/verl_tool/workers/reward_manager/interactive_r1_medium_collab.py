@@ -8,19 +8,16 @@ import json
 import time
 import os
 import numpy as np
-import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any
 from verl import DataProto
 from verl.workers.reward_manager.registry import register
 from .reward_score import _default_compute_score
 from collections import defaultdict
 from pathlib import Path
-from .math_utils import extract_answer, grade_answer_sympy, grade_answer_mathd
+from nltk.translate.bleu_score import sentence_bleu
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from .metrics.helpfulness import HelpfullnessMetric
 
-# Global lock to keep concurrent debug printing readable
-PRINT_LOCK = threading.Lock()
 
 def _count_asking_tags(text):
     opening_tags = text.count("<asking>")
@@ -58,9 +55,16 @@ def _compute_helpfullness_reward(question, response, qa_pairs):
     return helpfulness_goldens
 
 
-def compute_score(solution_str, ground_truth, base_score = 0.5):
+def compute_score(solution_str, ground_truth, format_score=0.0, score=0.5):
     """
     The scoring function for Interactive-R1 style exact match (EM).
+
+    Args:
+        solution_str: the solution text
+        ground_truth: the ground truth dict with 'target' field
+        method: the method to extract the solution, choices are 'strict' and 'flexible'
+        format_score: the score for the format
+        score: the score for the correct answer
     """
     if "</think>" in solution_str.split("<｜Assistant｜>")[-1]:
         model_think = solution_str.split("<｜Assistant｜>")[-1].split("</think>")[0]
@@ -69,74 +73,69 @@ def compute_score(solution_str, ground_truth, base_score = 0.5):
     else:
         model_output = ""
         model_think = ""
-    answer = extract_answer(model_output)
+
     open_count, close_count = _count_asking_tags(model_think)
 
     do_print = random.randint(1, 64) == 1
 
     if do_print:
-        with PRINT_LOCK:
-            print("--------------------------------")
-            # ground truth
-            print(f"Golden answers: {ground_truth['target']}")
+        print("--------------------------------")
+        # ground truth
+        print(f"Golden answers: {ground_truth.get('target', ground_truth) if isinstance(ground_truth, dict) else ground_truth}")
+        print(f"Golden turns: {ground_truth.get('turn', ground_truth) if isinstance(ground_truth, dict) else ground_truth}")
 
-            # extracted answer from model
-            if answer is not None:
-                print(f"Extracted answer is not None: {answer}")
-            else:
-                print("Extracted answer: None!")
-
-            # raw output of the model
-            print(f"Solution string: {solution_str}")
-
-    if answer is None:
-        return 0.0, 0.0, 0.0
-    else:
-        # Handle both dict and list ground truth formats
-        target_answer = extract_answer(ground_truth['target'])
-        single_turn_prompt_raw = ground_truth['single_turn_prompt_raw']
-        target_answer_is_correct = grade_answer_mathd(answer, target_answer) or grade_answer_sympy(answer, target_answer)
-        judge, qa_pairs = _extract_qa_pairs(model_think)
-
-        if target_answer_is_correct:
-            if open_count > 0 or close_count > 0:
-                eff_reward = (5 - open_count) / (5 - 1)
-                if judge and open_count == close_count:
-                    helpful_reward = []
-                    futures = []
-                    with ThreadPoolExecutor(max_workers=8) as executor:
-                        for i, (current_asking, current_response) in enumerate(qa_pairs):
-
-                            prev_history = qa_pairs[:i]
-                            
-                            futures.append(
-                                executor.submit(
-                                    _compute_helpfullness_reward,
-                                    question=single_turn_prompt_raw, # 原始题目
-                                    response=current_asking,      # 当前要打分的 asking
-                                    qa_pairs=prev_history          # 之前的 QA 历史
-                                )
-                            )
-                        # 用索引保持顺序
-                        results = [None] * len(qa_pairs)
-                        for i, f in enumerate(futures):
-                            results[i] = futures[i].result()  # 不用 as_completed
-                        helpful_reward = results
-
-                    return base_score, helpful_reward, eff_reward
-                else:
-                    return base_score, 1.0, eff_reward
-            else:
-                return base_score, 0.0, 0.0
+        # extracted answer from model
+        if model_output is not None:
+            print(f"model_output is not None: {model_output}")
         else:
-            return 0.0, 0.0, 0.0
+            print("model_output: None!")
+
+        # raw output of the model
+        print(f"Solution string: {solution_str}")
+
+    if model_output is None:
+        return 0
+    else:
+        target_answer = ground_truth.get('target', ground_truth) if isinstance(ground_truth, dict) else ground_truth
+        single_turn_prompt_raw = ground_truth.get('single_turn_prompt_raw', "") if isinstance(ground_truth, dict) else ""
+
+        bleu_score = sentence_bleu([target_answer.strip().split()], model_output.strip().split())
+        judge,qa_pairs = _extract_qa_pairs(model_think)
 
 
-@register("interactive_r1_math_collab")
+        if open_count>0 or close_count>0:
+            if judge and open_count==close_count:
+                eff_reward = (5 - open_count) / (5 - 1)
+
+                helpful_reward = []
+                futures = []
+                with ThreadPoolExecutor(max_workers=16) as executor:
+                    for i, (current_asking, current_response) in enumerate(qa_pairs):
+                        prev_history = qa_pairs[:i]
+                        futures.append(
+                            executor.submit(
+                                _compute_helpfullness_reward,
+                                question=single_turn_prompt_raw,
+                                response=current_asking,
+                                qa_pairs=prev_history,
+                            )
+                        )
+                    for f in as_completed(futures):
+                        helpful_reward.append(f.result())
+
+                return bleu_score + (bleu_score * np.mean(helpful_reward) * eff_reward)
+            else:
+                return bleu_score
+        else:
+            
+            return bleu_score
+
+
+@register("interactive_r1_medium_collab")
 class InteractiveR1MathRewardManager:
-    name = "interactive_r1_math_collab"
+    name = "interactive_r1_medium_collab"
     
-    def __init__(self, tokenizer=None, num_examine=1, compute_score=None, base_score=0.5, run_id=None, **kwargs) -> None:
+    def __init__(self, tokenizer=None, num_examine=1, compute_score=None, format_score=0.0, score=1.0, run_id=None, **kwargs) -> None:
         if tokenizer is None:
             from transformers import AutoTokenizer
             model_path = "/data1/HF-Models/Qwen/Qwen2.5-7B-Instruct" 
@@ -148,10 +147,10 @@ class InteractiveR1MathRewardManager:
         self.tokenizer = tokenizer
         self.num_examine = num_examine
         self.compute_score = compute_score or _default_compute_score
-        self.base_score = base_score
+        self.format_score = format_score
+        self.score = score
         self.step = None
         self.run_id = run_id
-        self.reward_max_workers = int(os.getenv('REWARD_MAX_WORKERS', 64))
 
     def _setup_record_dir(self, data):
         if not hasattr(self, 'record_dir'):
@@ -215,11 +214,12 @@ class InteractiveR1MathRewardManager:
                 data_source = data_item.non_tensor_batch.get('data_source', 'unknown')
 
                 # 调用计算函数
-                base_score, helpfulness_score, efficiency_score = compute_score(
-                    solution_str=sequences_str,
-                    ground_truth=ground_truth,
+                calculated_score = compute_score(
+                    solution_str=sequences_str, 
+                    ground_truth=ground_truth, 
+                    format_score=self.format_score,
+                    score=self.score
                 )
-                calculated_score = base_score + (base_score * np.mean(helpfulness_score) * efficiency_score)
 
                 record = {
                     'id': data_item.non_tensor_batch['extra_info']['id'] if 'id' in data_item.non_tensor_batch['extra_info'] else None,
@@ -228,9 +228,6 @@ class InteractiveR1MathRewardManager:
                     "response": self.tokenizer.decode(response_ids[:valid_response_length], skip_special_tokens=False),
                     'ground_truth': ground_truth,
                     'score': calculated_score,
-                    "base_score": base_score,
-                    'helpfulness_score': helpfulness_score,
-                    'efficiency_score': efficiency_score,
                     'tool_interact_info': data[i].non_tensor_batch.get('tool_interact_info', None),
                     'extra_info': data_item.non_tensor_batch.get('extra_info', None),
                 }
@@ -247,7 +244,7 @@ class InteractiveR1MathRewardManager:
                 return i, 0.0, 1, None
 
         # --- 并行执行 ---
-        with ThreadPoolExecutor(max_workers=self.reward_max_workers) as executor:
+        with ThreadPoolExecutor(max_workers=64) as executor:
             # 提交任务
             futures = [executor.submit(process_item, i, data[i]) for i in range(batch_size)]
             
@@ -330,3 +327,5 @@ class InteractiveR1MathRewardManager:
             }
         else:
             return reward_tensor
+
+
